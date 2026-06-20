@@ -1,0 +1,164 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* DineFlow — Modern Cafe Light design system
+ * Cream + sage + terracotta + warm brown.
+ * All colors expressed as HSL for tailwind compatibility.
+ */
+
+@layer base {
+  :root {
+    /* surface */
+    --background: 38 46% 98%;        /* #fefcf8 cream */
+    --foreground: 25 30% 14%;        /* deep coffee */
+    --card: 0 0% 100%;
+    --card-foreground: 25 30% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 25 30% 14%;
+
+    /* brand */
+    --primary: 28 32% 41%;           /* #8b6f47 warm brown */
+    --primary-foreground: 38 46% 98%;
+    --primary-glow: 28 45% 55%;
+
+    --secondary: 38 30% 92%;         /* #e8e0d0 sand */
+    --secondary-foreground: 25 30% 18%;
+
+    --muted: 38 30% 94%;
+    --muted-foreground: 25 12% 42%;
+
+    --accent: 108 16% 54%;           /* #7d9b76 sage */
+    --accent-foreground: 0 0% 100%;
+
+    --terracotta: 14 65% 55%;        /* warm clay */
+    --terracotta-foreground: 0 0% 100%;
+
+    --warning: 35 90% 55%;
+    --warning-foreground: 25 30% 14%;
+
+    --success: 142 55% 38%;
+    --success-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 35 25% 88%;
+    --input: 35 25% 90%;
+    --ring: 28 32% 41%;
+
+    --radius: 0.875rem;
+
+    /* gradients */
+    --gradient-warm: linear-gradient(135deg, hsl(28 45% 55%) 0%, hsl(14 65% 55%) 100%);
+    --gradient-sage: linear-gradient(135deg, hsl(108 16% 54%) 0%, hsl(142 35% 45%) 100%);
+    --gradient-cream: linear-gradient(180deg, hsl(38 46% 98%) 0%, hsl(38 30% 94%) 100%);
+    --gradient-hero: radial-gradient(ellipse at top left, hsl(28 45% 88% / 0.6), transparent 50%),
+                     radial-gradient(ellipse at bottom right, hsl(108 30% 85% / 0.5), transparent 50%);
+
+    /* shadows */
+    --shadow-soft: 0 2px 8px -2px hsl(25 30% 14% / 0.06), 0 4px 16px -4px hsl(25 30% 14% / 0.04);
+    --shadow-elevated: 0 8px 24px -8px hsl(25 30% 14% / 0.12), 0 4px 8px -4px hsl(25 30% 14% / 0.06);
+    --shadow-warm: 0 12px 32px -8px hsl(28 45% 55% / 0.25);
+    --shadow-glow: 0 0 0 1px hsl(28 32% 41% / 0.08), 0 12px 40px -12px hsl(28 32% 41% / 0.25);
+
+    /* status colors used everywhere (tables, kitchen) */
+    --status-available: 142 55% 42%;
+    --status-ordering: 210 80% 55%;
+    --status-kitchen: 28 90% 55%;
+    --status-preparing: 45 95% 55%;
+    --status-ready: 270 60% 60%;
+    --status-payment: 0 72% 55%;
+    --status-paid: 25 8% 55%;
+
+    /* sidebar */
+    --sidebar-background: 35 35% 96%;
+    --sidebar-foreground: 25 30% 18%;
+    --sidebar-primary: 28 32% 41%;
+    --sidebar-primary-foreground: 38 46% 98%;
+    --sidebar-accent: 38 40% 90%;
+    --sidebar-accent-foreground: 25 30% 18%;
+    --sidebar-border: 35 25% 86%;
+    --sidebar-ring: 28 32% 41%;
+  }
+
+  .dark {
+    --background: 25 20% 8%;
+    --foreground: 38 46% 96%;
+    --card: 25 18% 12%;
+    --card-foreground: 38 46% 96%;
+    --popover: 25 18% 12%;
+    --popover-foreground: 38 46% 96%;
+    --primary: 28 45% 60%;
+    --primary-foreground: 25 20% 8%;
+    --secondary: 25 12% 18%;
+    --secondary-foreground: 38 46% 96%;
+    --muted: 25 12% 18%;
+    --muted-foreground: 38 10% 65%;
+    --accent: 108 25% 55%;
+    --accent-foreground: 25 20% 8%;
+    --border: 25 12% 22%;
+    --input: 25 12% 22%;
+    --ring: 28 45% 60%;
+    --sidebar-background: 25 20% 10%;
+    --sidebar-foreground: 38 46% 96%;
+  }
+
+  * { @apply border-border; }
+  html { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv11", "ss01";
+  }
+  .font-serif { font-family: 'Instrument Serif', Georgia, serif; }
+}
+
+@layer components {
+  .glass-card {
+    background: hsl(0 0% 100% / 0.65);
+    backdrop-filter: blur(16px) saturate(1.4);
+    border: 1px solid hsl(35 25% 88% / 0.8);
+  }
+  .gradient-warm { background: var(--gradient-warm); }
+  .gradient-sage { background: var(--gradient-sage); }
+  .gradient-hero { background: var(--gradient-hero); }
+  .shadow-soft { box-shadow: var(--shadow-soft); }
+  .shadow-elevated { box-shadow: var(--shadow-elevated); }
+  .shadow-warm { box-shadow: var(--shadow-warm); }
+  .shadow-glow { box-shadow: var(--shadow-glow); }
+
+  .status-dot {
+    @apply inline-block w-2 h-2 rounded-full;
+  }
+
+  .demo-badge {
+    background: linear-gradient(135deg, hsl(14 65% 55%), hsl(28 80% 55%));
+    color: white;
+    box-shadow: 0 4px 12px -2px hsl(14 65% 55% / 0.4);
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border)); border-radius: 3px;
+  }
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 hsl(var(--accent) / 0.4); }
+    70% { box-shadow: 0 0 0 12px hsl(var(--accent) / 0); }
+    100% { box-shadow: 0 0 0 0 hsl(var(--accent) / 0); }
+  }
+  .animate-pulse-ring { animation: pulse-ring 2s infinite; }
+
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-slide-up { animation: slide-up 0.35s ease-out; }
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }
