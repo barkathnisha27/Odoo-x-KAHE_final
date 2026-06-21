@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useStore, formatINR } from "@/lib/store";
+import { useStore, formatINR, saveKitchenOrder } from "@/lib/store";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,13 +11,69 @@ import { DemoBadge } from "@/components/DemoBadge";
 export default function QrOrder() {
   const { token } = useParams();
   const nav = useNavigate();
-  const { tables, products, categories, orders, createOrder, addItemToOrder, removeItemFromOrder, changeItemQty, sendToKitchen, getProductAvailability } = useStore();
-  const table = tables.find(t => t.qr_token === token) ?? tables[2];
+  const { 
+    tables, 
+    products, 
+    categories, 
+    orders, 
+    createOrder, 
+    addItemToOrder, 
+    removeItemFromOrder, 
+    changeItemQty, 
+    sendToKitchen, 
+    sendOrderToKitchen,
+    getProductAvailability,
+    setCurrentCafeId
+  } = useStore();
+
+  // Parse cafe_id and table_id from token
+  const { parsedCafeId, parsedTableId } = useMemo(() => {
+    let cafeId = "demo-cafe-1";
+    let tableId = "t3";
+    
+    if (token) {
+      try {
+        // Try base64 JSON
+        const decoded = atob(token);
+        const obj = JSON.parse(decoded);
+        if (obj.cafe_id) cafeId = obj.cafe_id;
+        if (obj.table_id) tableId = obj.table_id;
+      } catch (e) {
+        // Try cafeId_tableId
+        if (token.includes("_")) {
+          const parts = token.split("_");
+          cafeId = parts[0];
+          tableId = parts[1];
+        } else {
+          // Legacy/Seed lookup
+          const matchedTable = tables.find(t => t.qr_token === token);
+          if (matchedTable) {
+            cafeId = matchedTable.cafe_id;
+            tableId = matchedTable.id;
+          }
+        }
+      }
+    }
+    return { parsedCafeId: cafeId, parsedTableId: tableId };
+  }, [token, tables]);
+
+  // Sync workspace ID on mount/token change
+  useEffect(() => {
+    setCurrentCafeId(parsedCafeId);
+  }, [parsedCafeId, setCurrentCafeId]);
+
   const [orderId, setOrderId] = useState<string | null>(null);
   const [cat, setCat] = useState<string | "all">("all");
   const order = orders.find(o => o.id === orderId);
 
-  const filtered = useMemo(() => products.filter(p => cat === "all" || p.category_id === cat), [products, cat]);
+  // Scope entities to active cafe
+  const cafeTables = useMemo(() => tables.filter(t => t.cafe_id === parsedCafeId), [tables, parsedCafeId]);
+  const table = useMemo(() => cafeTables.find(t => t.id === parsedTableId) || cafeTables[0] || tables[2], [cafeTables, parsedTableId, tables]);
+  
+  const cafeCategories = useMemo(() => categories.filter(c => c.cafe_id === parsedCafeId), [categories, parsedCafeId]);
+  const cafeProducts = useMemo(() => products.filter(p => p.cafe_id === parsedCafeId), [products, parsedCafeId]);
+
+  const filtered = useMemo(() => cafeProducts.filter(p => cat === "all" || p.category_id === cat), [cafeProducts, cat]);
 
   function ensureOrder() {
     if (order) return order;
@@ -34,9 +90,28 @@ export default function QrOrder() {
   }
 
   function place() {
-    if (!order || order.items.length === 0) return;
-    sendToKitchen(order.id);
-    toast.success("Order sent! Watch the screen for updates.");
+    if (!order || !order.items || order.items.length === 0) {
+      toast.error("Add items before sending to kitchen.");
+      return;
+    }
+
+    sendOrderToKitchen({
+      ...order,
+      order_source: "qr_table",
+      status: "to_cook",
+      order_status: "to_cook",
+      kitchen_status: "to_cook",
+      customer_status: "sent_to_kitchen",
+      payment_status: order.payment_status === "paid" ? "paid" : "pending",
+      table_number: table?.table_number ?? order.table_number,
+    });
+    
+    saveKitchenOrder({
+      ...order,
+      order_source: "qr_table",
+    });
+    
+    toast.success("Order sent to kitchen successfully.");
     nav(`/customer-display/${order.id}`);
   }
 
@@ -54,7 +129,7 @@ export default function QrOrder() {
         </div>
         <div className="container pb-3 flex gap-2 overflow-x-auto scrollbar-thin">
           <button onClick={() => setCat("all")} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap ${cat === "all" ? "bg-foreground text-background" : "bg-card border-border"}`}>All</button>
-          {categories.map(c => (
+          {cafeCategories.map(c => (
             <button key={c.id} onClick={() => setCat(c.id)} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap ${cat === c.id ? "text-white border-transparent" : "bg-card border-border"}`} style={cat === c.id ? { background: c.color } : {}}>{c.name}</button>
           ))}
         </div>
@@ -101,3 +176,4 @@ export default function QrOrder() {
     </div>
   );
 }
+

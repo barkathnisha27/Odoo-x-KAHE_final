@@ -9,6 +9,7 @@ import { Sparkles, TrendingUp, AlertTriangle, Truck, Trash2, Clock, Download } f
 import { useStore, formatINR } from "@/lib/store";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid, AreaChart, Area } from "recharts";
 import { exportToPDF, exportToXLSX } from "@/lib/exporters";
+import { toast } from "sonner";
 
 const DEMAND_FORECAST = [
   { hour: "10am", actual: 4, predicted: 5 },
@@ -46,18 +47,23 @@ export default function Predictions() {
   }));
 
   const handleExport = (type: "pdf" | "xlsx") => {
-    if (type === "xlsx") {
-      exportToXLSX("dineflow-predictions", [
-        { name: "Demand", rows: DEMAND_FORECAST },
-        { name: "Delay Risk", rows: DELAY_RISK },
-        { name: "Restock", rows: restockSuggestions },
-      ]);
-    } else {
-      exportToPDF("dineflow-predictions", "Predictive Insights Report", [
-        { heading: "Hourly Demand Forecast", columns: ["Hour", "Actual", "Predicted"], rows: DEMAND_FORECAST.map(r => [r.hour, r.actual ?? "—", r.predicted]) },
-        { heading: "Delay Risk", columns: ["Item", "Risk %"], rows: DELAY_RISK.map(r => [r.item, r.risk]) },
-        { heading: "Restock Suggestions", columns: ["Ingredient", "Current", "Suggested", "Supplier", "ETA", "Cost"], rows: restockSuggestions.map(r => [r.name, r.current, r.suggested, r.supplier, r.eta, r.cost]) },
-      ]);
+    try {
+      if (type === "xlsx") {
+        exportToXLSX("dineflow-predictions", [
+          { name: "Demand", rows: DEMAND_FORECAST },
+          { name: "Delay Risk", rows: DELAY_RISK },
+          { name: "Restock", rows: restockSuggestions },
+        ]);
+      } else {
+        exportToPDF("dineflow-predictions", "Predictive Insights Report", [
+          { heading: "Hourly Demand Forecast", columns: ["Hour", "Actual", "Predicted"], rows: DEMAND_FORECAST.map(r => [r.hour, r.actual ?? "—", r.predicted]) },
+          { heading: "Delay Risk", columns: ["Item", "Risk %"], rows: DELAY_RISK.map(r => [r.item, r.risk]) },
+          { heading: "Restock Suggestions", columns: ["Ingredient", "Current", "Suggested", "Supplier", "ETA", "Cost"], rows: restockSuggestions.map(r => [r.name, r.current, r.suggested, r.supplier, r.eta, r.cost]) },
+        ]);
+      }
+      toast.success("Report downloaded successfully.");
+    } catch (e) {
+      toast.error("Failed to download report. Please try again.");
     }
   };
 

@@ -13,6 +13,8 @@ import {
   PieChart, Pie, Cell, CartesianGrid,
 } from "recharts";
 import { DemoBadge } from "@/components/DemoBadge";
+import { dedupeProducts, dedupeByKey } from "@/lib/dedupe";
+
 
 const HOUR_DATA = [
   { hour: "10am", orders: 4 }, { hour: "11am", orders: 6 }, { hour: "12pm", orders: 12 },
@@ -37,7 +39,11 @@ const AI_INSIGHTS = [
 ];
 
 export default function AdminDashboard() {
-  const { products, orders, ingredients, tables, customer } = useStore();
+  const { products: rawProducts, orders, ingredients: rawIngredients, tables: rawTables, customer } = useStore();
+
+  const products = dedupeProducts(rawProducts);
+  const ingredients = dedupeByKey(rawIngredients, i => `${i.cafe_id || "demo"}|${i.name}`);
+  const tables = dedupeByKey(rawTables, t => `${t.cafe_id || "demo"}|${t.floor_id}|${t.table_number}`);
 
   const todayRevenue = orders.filter(o => o.payment_status === "paid").reduce((s, o) => s + o.total_amount, 0) + 12480;
   const totalOrders = orders.filter(o => o.payment_status === "paid").length + 47;
@@ -98,22 +104,19 @@ export default function AdminDashboard() {
             </ResponsiveContainer>
           </Card>
 
-          {/* AI insights */}
-          <Card className="p-5 shadow-soft border-primary/20 bg-gradient-to-br from-secondary/40 to-card">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg gradient-warm flex items-center justify-center"><Sparkles className="w-4 h-4 text-white" /></div>
-              <div>
-                <div className="font-semibold text-sm">AI Business Insights</div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Updated live</div>
-              </div>
-            </div>
+          {/* Shortcuts */}
+          <Card className="p-5 shadow-soft border-primary/20 bg-gradient-to-br from-secondary/40 to-card flex flex-col justify-center">
+            <div className="font-semibold text-sm mb-3">Quick Actions</div>
             <div className="space-y-2">
-              {AI_INSIGHTS.map((s, i) => (
-                <div key={i} className="text-xs p-2.5 rounded-lg bg-card/80 flex gap-2">
-                  <Sparkles className="w-3.5 h-3.5 text-terracotta shrink-0 mt-0.5" />
-                  <span>{s}</span>
-                </div>
-              ))}
+              <Link to="/admin/ai" className="block p-3 rounded-lg bg-card hover:bg-accent/10 transition-colors border border-border flex items-center gap-2 text-sm">
+                <Sparkles className="w-4 h-4 text-terracotta" /> Ask AI Assistant
+              </Link>
+              <Link to="/admin/map" className="block p-3 rounded-lg bg-card hover:bg-accent/10 transition-colors border border-border flex items-center gap-2 text-sm">
+                <MapIcon className="w-4 h-4 text-primary" /> View Map Intelligence
+              </Link>
+              <Link to="/admin/predictions" className="block p-3 rounded-lg bg-card hover:bg-accent/10 transition-colors border border-border flex items-center gap-2 text-sm">
+                <TrendingUp className="w-4 h-4 text-warning" /> View Demand Predictions
+              </Link>
             </div>
           </Card>
         </div>
@@ -168,8 +171,8 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Inventory + Map preview */}
-        <div className="grid lg:grid-cols-2 gap-6">
+        {/* Inventory preview */}
+        <div className="grid lg:grid-cols-1 gap-6">
           <Card className="p-5 shadow-soft">
             <div className="flex items-center justify-between mb-3">
               <div className="font-semibold flex items-center gap-2"><Package className="w-4 h-4" /> Ingredient Stock Alerts</div>
@@ -189,22 +192,6 @@ export default function AdminDashboard() {
                   </div>
                 );
               })}
-            </div>
-          </Card>
-
-          <Card className="p-5 shadow-soft">
-            <div className="flex items-center justify-between mb-3">
-              <div className="font-semibold flex items-center gap-2"><MapIcon className="w-4 h-4" /> Map Intelligence</div>
-              <Link to="/admin/map" className="text-xs text-primary hover:underline">Open map →</Link>
-            </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between p-2 rounded-lg bg-secondary/40"><span className="flex items-center gap-2"><Truck className="w-3.5 h-3.5" /> Karpagam College</span><span className="text-xs text-accent font-semibold">42 orders · High demand</span></div>
-              <div className="flex justify-between p-2 rounded-lg bg-secondary/40"><span className="flex items-center gap-2"><Truck className="w-3.5 h-3.5" /> Gandhipuram</span><span className="text-xs text-accent font-semibold">35 orders · High demand</span></div>
-              <div className="flex justify-between p-2 rounded-lg bg-secondary/40"><span className="flex items-center gap-2"><Truck className="w-3.5 h-3.5" /> Peelamedu</span><span className="text-xs text-warning font-semibold">22 orders · Medium</span></div>
-              <div className="p-3 mt-3 rounded-lg gradient-sage text-white text-xs">
-                <Sparkles className="w-3.5 h-3.5 inline mr-1.5" />
-                Aavin Milk Distributor is 2.4 km away — 18 min ETA. Suggested for Milk restock.
-              </div>
             </div>
           </Card>
         </div>

@@ -2,6 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useStore, formatINR } from "@/lib/store";
 import { Card } from "@/components/ui/card";
 import { CheckCircle2, ChefHat, Utensils, ShoppingBag, Coffee } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { DemoBadge } from "@/components/DemoBadge";
 
 const STAGES = [
@@ -14,7 +15,10 @@ const STAGES = [
 export default function CustomerDisplay() {
   const { orderId } = useParams();
   const { orders } = useStore();
-  const order = orders.find(o => o.id === orderId);
+  const order = orderId 
+    ? orders.find(o => o.id === orderId)
+    : orders.find(o => o.order_status !== "paid" && o.order_status !== "cancelled" && o.order_status !== "draft") 
+      || orders[0];
 
   if (!order) return (
     <div className="min-h-screen flex items-center justify-center bg-secondary/50">
@@ -70,6 +74,14 @@ export default function CustomerDisplay() {
                 <span>Total</span><span>{formatINR(order.total_amount)}</span>
               </div>
             </div>
+            {order.payment_status === "unpaid" && order.order_status !== "draft" && (
+              <div className="mt-6 pt-6 border-t border-border flex flex-col items-center">
+                <div className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Scan to Pay (UPI)</div>
+                <div className="bg-white p-3 rounded-xl shadow-soft">
+                  <QRCodeSVG value={`upi://pay?pa=cafe@upi&pn=DineFlow&am=${order.total_amount}&cu=INR`} size={140} />
+                </div>
+              </div>
+            )}
           </Card>
 
           <Card className="p-8 shadow-elevated flex flex-col">

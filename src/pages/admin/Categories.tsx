@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Tag, Plus, Edit, Trash2 } from "lucide-react";
+import { Tag, Plus, Edit, Trash2, FileText, FileSpreadsheet } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { Category } from "@/lib/types";
 import { toast } from "sonner";
+import { exportToPDF, exportToXLSX } from "@/lib/exporters";
 
 const COLORS = ["#c2956b", "#e8a87c", "#c4654a", "#9b72cf", "#7d9b76", "#5b8bb2", "#d4af37", "#a8556b"];
 
@@ -32,12 +33,53 @@ export default function Categories() {
     toast.success("Saved");
   };
 
+  const handlePDF = () => {
+    try {
+      exportToPDF("dineflow_category_report", "Categories Report", [
+        {
+          heading: "Categories",
+          columns: ["Name", "Items"],
+          rows: categories.map(c => [
+            c.name,
+            products.filter(p => p.category_id === c.id).length.toString()
+          ])
+        }
+      ]);
+      toast.success("Report downloaded successfully.");
+    } catch (e) {
+      toast.error("Failed to download report. Please try again.");
+    }
+  };
+
+  const handleXLSX = () => {
+    try {
+      exportToXLSX("dineflow_category_report", [
+        {
+          name: "Categories",
+          rows: categories.map(c => ({
+            Name: c.name,
+            Items: products.filter(p => p.category_id === c.id).length
+          }))
+        }
+      ]);
+      toast.success("Report downloaded successfully.");
+    } catch (e) {
+      toast.error("Failed to download report. Please try again.");
+    }
+  };
+
   return (
     <AppShell>
       <DemoBadge />
       <div className="p-6 lg:p-8 max-w-5xl mx-auto">
         <PageHeader icon={Tag} title="Categories" description="Organise products into menu categories"
-          actions={<Button onClick={() => { setEditing({ id: "cat" + Math.random().toString(36).slice(2, 7), name: "", color: COLORS[0], icon: "Coffee" }); setOpen(true); }}><Plus className="w-4 h-4 mr-1.5" /> New Category</Button>}
+          actions={
+            <>
+              <Button variant="outline" onClick={handlePDF}><FileText className="w-4 h-4 mr-1.5" /> Export PDF</Button>
+              <Button variant="outline" onClick={handleXLSX}><FileSpreadsheet className="w-4 h-4 mr-1.5" /> Export Excel</Button>
+              <Button onClick={() => { setEditing({ id: "cat" + Math.random().toString(36).slice(2, 7), name: "", color: COLORS[0], icon: "Coffee" }); setOpen(true); }}><Plus className="w-4 h-4 mr-1.5" /> New Category</Button>
+            </>
+          }
         />
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">

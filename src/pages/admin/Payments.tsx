@@ -8,12 +8,15 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, Banknote, Smartphone, QrCode } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { dedupeByKey } from "@/lib/dedupe";
 import { toast } from "sonner";
 
 const ICONS: Record<string, any> = { cash: Banknote, card: CreditCard, upi: Smartphone };
 
 export default function Payments() {
   const { paymentMethods, togglePaymentMethod, setUpiId } = useStore();
+  const uniqueMethods = dedupeByKey(paymentMethods, (p) => `${p.cafe_id || "demo"}|${p.id}`);
+
   return (
     <AppShell>
       <DemoBadge />
@@ -21,7 +24,7 @@ export default function Payments() {
         <PageHeader icon={CreditCard} title="Payment Methods" description="Enable or disable how customers can pay" />
 
         <div className="space-y-3">
-          {paymentMethods.map(p => {
+          {uniqueMethods.map(p => {
             const Icon = ICONS[p.id];
             return (
               <Card key={p.id} className="p-4 shadow-soft">

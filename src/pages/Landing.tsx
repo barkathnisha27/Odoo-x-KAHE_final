@@ -5,19 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Coffee, ShoppingBag, ChefHat, Sparkles, Utensils, QrCode, Brain, FlaskConical,
-  Map, ArrowRight, Loader2, ShieldCheck,
+  Map, ArrowRight, Loader2,
 } from "lucide-react";
 import { DemoBadge } from "@/components/DemoBadge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AdminSignup } from "@/components/auth/AdminSignup";
+import { StaffSignup } from "@/components/auth/StaffSignup";
 
 const ROLE_REDIRECT = {
-  admin: "/admin",
+  admin: "/pos",
   cashier: "/pos",
   kitchen: "/kds",
   customer: "/customer",
+  guest: "/customer",
 } as const;
 
 const FEATURES = [
@@ -32,31 +35,29 @@ const FEATURES = [
 ];
 
 export default function Landing() {
-  const { user, role, signIn, signUp, demoLogin, loading } = useAuth();
+  const { user, role, signIn, signUp, loading, guestSignIn, isLocalMode } = useAuth();
   const nav = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
+  const [view, setView] = useState<"login" | "customer-signup" | "admin-signup" | "staff-signup">("login");
+  
+  const [loginRole, setLoginRole] = useState<"admin" | "cashier" | "kitchen" | "customer">("customer");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPw, setLoginPw] = useState("");
+  
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPw, setSignupPw] = useState("");
+  
+  const [guestName, setGuestName] = useState("");
 
   useEffect(() => {
     if (!loading && user && role) nav(ROLE_REDIRECT[role]);
   }, [loading, user, role, nav]);
 
-  async function onDemoLogin(r: keyof typeof DEMO_CREDENTIALS) {
-    setBusy(r);
-    const { error } = await demoLogin(r);
-    setBusy(null);
-    if (error) toast.error(error);
-    else toast.success(`Signed in as ${r}`);
-  }
-
   async function onLogin(e: React.FormEvent) {
     e.preventDefault();
     setBusy("login");
-    const { error } = await signIn(loginEmail, loginPw);
+    const { error } = await signIn(loginEmail, loginPw, loginRole);
     setBusy(null);
     if (error) toast.error(error);
   }
@@ -67,12 +68,27 @@ export default function Landing() {
     const { error } = await signUp({ email: signupEmail, password: signupPw, name: signupName, role: "customer" });
     setBusy(null);
     if (error) toast.error(error);
-    else toast.success("Welcome to DineFlow!");
+    else {
+      toast.success("Welcome to DineFlow! Log in to access your dashboard.");
+      setView("login");
+    }
+  }
+
+  async function onGuest(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    await guestSignIn(guestName || undefined);
+    nav(ROLE_REDIRECT["customer"]);
   }
 
   return (
     <div className="min-h-screen gradient-hero">
       <DemoBadge />
+      {isLocalMode && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-300 text-xs text-center py-2 px-4 flex items-center justify-center gap-2 backdrop-blur-sm">
+          <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+          <span><strong>Local Demo Mode Active:</strong> Supabase database migrations not fully applied. Accounts and cafe workspace data will persist in local browser storage.</span>
+        </div>
+      )}
       <header className="border-b border-border/40 backdrop-blur-sm bg-background/60 sticky top-0 z-30">
         <div className="container flex items-center justify-between h-16">
           <div className="flex items-center gap-2.5">
@@ -84,7 +100,7 @@ export default function Landing() {
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">AI-powered POS</div>
             </div>
           </div>
-          <a href="#login" className="text-sm font-medium text-muted-foreground hover:text-foreground">Sign in →</a>
+          <button onClick={() => setView("login")} className="text-sm font-medium text-muted-foreground hover:text-foreground">Sign in →</button>
         </div>
       </header>
 
@@ -119,62 +135,118 @@ export default function Landing() {
 
         <div id="login" className="lg:pl-8">
           <Card className="p-7 shadow-elevated border-border/60">
-            <div className="text-center mb-5">
-              <h2 className="font-serif text-2xl">Welcome back</h2>
-              <p className="text-sm text-muted-foreground mt-1">Pick a demo role or use your account</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 mb-5">
-              {(Object.keys(DEMO_CREDENTIALS) as Array<keyof typeof DEMO_CREDENTIALS>).map(r => {
-                const Icon = r === "admin" ? ShieldCheck : r === "cashier" ? ShoppingBag : r === "kitchen" ? ChefHat : Utensils;
-                return (
-                  <Button
-                    key={r}
-                    variant="outline"
-                    onClick={() => onDemoLogin(r)}
-                    disabled={!!busy}
-                    className="h-auto py-3 flex-col gap-1 hover:bg-secondary hover:border-primary/40"
-                  >
-                    {busy === r ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4 text-primary" />}
-                    <span className="text-xs font-semibold capitalize">{r}</span>
-                  </Button>
-                );
-              })}
-            </div>
-
-            <div className="relative my-5">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-              <div className="relative flex justify-center"><span className="bg-card px-2 text-xs text-muted-foreground">or</span></div>
-            </div>
-
-            <Tabs defaultValue="login">
-              <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="login">Sign in</TabsTrigger>
-                <TabsTrigger value="signup">Create account</TabsTrigger>
-              </TabsList>
-              <TabsContent value="login" className="mt-4">
+            {view === "login" && (
+              <>
+                <div className="text-center mb-5">
+                  <h2 className="font-serif text-2xl">Welcome back</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Sign in to your account</p>
+                </div>
                 <form onSubmit={onLogin} className="space-y-3">
-                  <div><Label htmlFor="le">Email</Label><Input id="le" type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required /></div>
-                  <div><Label htmlFor="lp">Password</Label><Input id="lp" type="password" value={loginPw} onChange={e => setLoginPw(e.target.value)} required /></div>
+                  <div>
+                    <Label>Role</Label>
+                    <Select value={loginRole} onValueChange={(v: any) => setLoginRole(v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin / Owner</SelectItem>
+                        <SelectItem value="cashier">Cashier</SelectItem>
+                        <SelectItem value="kitchen">Kitchen Staff</SelectItem>
+                        <SelectItem value="customer">Customer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="le">Email</Label>
+                    <Input id="le" type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required placeholder="email@address.com" />
+                  </div>
+                  <div>
+                    <Label htmlFor="lp">Password</Label>
+                    <Input id="lp" type="password" value={loginPw} onChange={e => setLoginPw(e.target.value)} required placeholder="••••••••" />
+                  </div>
                   <Button type="submit" className="w-full" disabled={!!busy}>
                     {busy === "login" ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Sign in <ArrowRight className="w-4 h-4 ml-1" /></>}
                   </Button>
                 </form>
-              </TabsContent>
-              <TabsContent value="signup" className="mt-4">
+
+                <div className="mt-4 pt-4 border-t border-border flex flex-col gap-2">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <button onClick={() => setView("customer-signup")} className="hover:text-primary transition-colors">Create Customer Account</button>
+                    <button onClick={() => setView("admin-signup")} className="hover:text-primary transition-colors font-medium">Create Cafe Account (Admin)</button>
+                  </div>
+                  <div className="text-center text-xs text-muted-foreground">
+                    <button onClick={() => setView("staff-signup")} className="hover:text-primary transition-colors">Join Cafe Team (Staff)</button>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="text-xs text-muted-foreground mb-2">Or continue as guest</div>
+                  <div className="flex gap-2">
+                    <Input placeholder="Your name (optional)" value={guestName} onChange={e => setGuestName(e.target.value)} />
+                    <Button onClick={onGuest}>Continue as Guest</Button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {view === "customer-signup" && (
+              <>
+                <div className="text-center mb-5">
+                  <h2 className="font-serif text-2xl">Create Customer Account</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Register to track loyalty and view dietary suggestions</p>
+                </div>
                 <form onSubmit={onSignup} className="space-y-3">
-                  <div><Label htmlFor="sn">Name</Label><Input id="sn" value={signupName} onChange={e => setSignupName(e.target.value)} required /></div>
-                  <div><Label htmlFor="se">Email</Label><Input id="se" type="email" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} required /></div>
-                  <div><Label htmlFor="sp">Password</Label><Input id="sp" type="password" value={signupPw} onChange={e => setSignupPw(e.target.value)} required minLength={6} /></div>
+                  <div>
+                    <Label htmlFor="sn">Name</Label>
+                    <Input id="sn" value={signupName} onChange={e => setSignupName(e.target.value)} required placeholder="Alex" />
+                  </div>
+                  <div>
+                    <Label htmlFor="se">Email</Label>
+                    <Input id="se" type="email" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} required placeholder="alex@gmail.com" />
+                  </div>
+                  <div>
+                    <Label htmlFor="sp">Password</Label>
+                    <Input id="sp" type="password" value={signupPw} onChange={e => setSignupPw(e.target.value)} required minLength={6} placeholder="••••••••" />
+                  </div>
                   <Button type="submit" className="w-full" disabled={!!busy}>
-                    {busy === "signup" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create customer account"}
+                    {busy === "signup" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Register"}
                   </Button>
                 </form>
-              </TabsContent>
-            </Tabs>
+                <div className="mt-4 text-center text-xs text-muted-foreground">
+                  <button onClick={() => setView("login")} className="hover:text-primary transition-colors">Already have an account? Sign in</button>
+                </div>
+              </>
+            )}
+
+            {view === "admin-signup" && (
+              <>
+                <div className="text-center mb-5">
+                  <h2 className="font-serif text-2xl">Create Restaurant Account</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Establish a new workspace for your staff and menu</p>
+                </div>
+                <AdminSignup onSuccess={() => setView("login")} onCancel={() => setView("login")} />
+                <div className="mt-4 text-center text-xs text-muted-foreground">
+                  <button onClick={() => setView("login")} className="hover:text-primary transition-colors">Already have an account? Sign in</button>
+                </div>
+              </>
+            )}
+
+            {view === "staff-signup" && (
+              <>
+                <div className="text-center mb-5">
+                  <h2 className="font-serif text-2xl">Join Restaurant Team</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Enter your invitation code to create a Cashier or Kitchen profile</p>
+                </div>
+                <StaffSignup onSuccess={() => setView("login")} onCancel={() => setView("login")} />
+                <div className="mt-4 text-center text-xs text-muted-foreground">
+                  <button onClick={() => setView("login")} className="hover:text-primary transition-colors">Already have an account? Sign in</button>
+                </div>
+              </>
+            )}
           </Card>
         </div>
       </section>
     </div>
   );
 }
+

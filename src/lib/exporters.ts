@@ -38,3 +38,84 @@ export function exportToPDF(filename: string, title: string, sections: { heading
   }
   doc.save(`${filename}.pdf`);
 }
+
+export function downloadOrderBillPDF(order: any) {
+  try {
+    if (!order) {
+      throw new Error("Order not found");
+    }
+
+    const doc = new jsPDF();
+
+    const items = Array.isArray(order.items) ? order.items : [];
+
+    const rows = items.map((item: any, index: number) => {
+      const quantity = Number(item.quantity || 0);
+      const unitPrice = Number(item.unit_price || item.price || 0);
+      const subtotal = Number(item.subtotal || quantity * unitPrice);
+
+      return [
+        index + 1,
+        item.product_name || item.name || "Item",
+        quantity,
+        `Rs. ${unitPrice.toFixed(2)}`,
+        `Rs. ${subtotal.toFixed(2)}`
+      ];
+    });
+
+    const subtotal = Number(order.subtotal || rows.reduce((sum: number, row: any, index: number) => {
+      const item = items[index];
+      const quantity = Number(item?.quantity || 0);
+      const unitPrice = Number(item?.unit_price || item?.price || 0);
+      return sum + quantity * unitPrice;
+    }, 0));
+
+    const discount = Number(order.discount_amount || order.discount || 0);
+    const tax = Number(order.tax_amount || order.tax || 0);
+    const total = Number(order.total_amount || order.total || subtotal - discount + tax);
+
+    doc.setFontSize(18);
+    doc.text("DineFlow Receipt", 14, 20);
+
+    doc.setFontSize(11);
+    doc.text(`Order: ${order.order_number || order.id || "N/A"}`, 14, 30);
+    doc.text(`Date: ${new Date(order.created_at || Date.now()).toLocaleString()}`, 14, 38);
+    doc.text(`Table: ${order.table_number || order.table_id || "N/A"}`, 14, 46);
+    doc.text(`Customer: ${order.customer_name || "Walk-in Customer"}`, 14, 54);
+    doc.text(`Payment: ${order.payment_method || order.payment_status || "Pending"}`, 14, 62);
+
+    if ((doc as any).autoTable) {
+      (doc as any).autoTable({
+        startY: 70,
+        head: [["#", "Item", "Qty", "Unit Price", "Subtotal"]],
+        body: rows
+      });
+    } else {
+      let y = 75;
+      doc.text("#  Item  Qty  Unit Price  Subtotal", 14, y);
+      rows.forEach((row: any) => {
+        y += 8;
+        doc.text(row.join("   "), 14, y);
+      });
+    }
+
+    const finalY = (doc as any).lastAutoTable?.finalY || 120;
+
+    doc.text(`Subtotal: Rs. ${subtotal.toFixed(2)}`, 14, finalY + 10);
+    doc.text(`Discount: Rs. ${discount.toFixed(2)}`, 14, finalY + 18);
+    doc.text(`Tax: Rs. ${tax.toFixed(2)}`, 14, finalY + 26);
+    doc.setFontSize(14);
+    doc.text(`Total: Rs. ${total.toFixed(2)}`, 14, finalY + 38);
+
+    doc.setFontSize(11);
+    doc.text("Thank you for ordering with DineFlow!", 14, finalY + 50);
+
+    const fileName = `dineflow_bill_${order.order_number || order.id || Date.now()}.pdf`;
+    doc.save(fileName);
+
+    return true;
+  } catch (error) {
+    console.error("Bill PDF download failed:", error);
+    return false;
+  }
+}

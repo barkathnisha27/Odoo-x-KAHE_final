@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { dedupeNavItems } from "@/lib/dedupe";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 
@@ -53,7 +54,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { role, user, signOut } = useAuth();
   const loc = useLocation();
   const nav = useNavigate();
-  const items = NAV[role || "customer"] || [];
+  // Only show navigation for resolved roles. If role is not set (not logged in), hide admin/cashier/kitchen/customer nav.
+  const rawItems = role ? (NAV[role] || []) : [];
+  const items = dedupeNavItems(rawItems);
 
   return (
     <div className="min-h-screen flex bg-background">

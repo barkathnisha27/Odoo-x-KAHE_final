@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, ReceiptText, ArrowRight } from "lucide-react";
+import { Search, ReceiptText, ArrowRight, Edit, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { DemoBadge } from "@/components/DemoBadge";
 
 export default function POSOrders() {
@@ -14,8 +15,14 @@ export default function POSOrders() {
   const { orders } = useStore();
   const [q, setQ] = useState("");
 
+  const deleteOrder = (id: string) => {
+    useStore.setState(s => ({ orders: s.orders.filter(o => o.id !== id) }));
+    toast.success("Order deleted");
+  };
+
   const list = orders.filter(o =>
-    q === "" || o.order_number.toLowerCase().includes(q.toLowerCase()) ||
+    q === "" || o.id.toLowerCase().includes(q.toLowerCase()) ||
+    o.order_number.toLowerCase().includes(q.toLowerCase()) ||
     (o.customer_name && o.customer_name.toLowerCase().includes(q.toLowerCase()))
   );
 
@@ -60,11 +67,19 @@ export default function POSOrders() {
                   </div>
                 </div>
                 <div className="font-serif text-xl">{formatINR(o.total_amount)}</div>
-                {o.payment_status !== "paid" && o.items.length > 0 ? (
-                  <Button size="sm" variant="outline" onClick={() => nav(`/pay/${o.id}`)}>Pay <ArrowRight className="w-3 h-3 ml-1" /></Button>
-                ) : (
-                  <Button size="sm" variant="ghost" onClick={() => nav(`/receipt/${o.id}`)}>Receipt</Button>
-                )}
+                <div className="flex gap-2">
+                  {o.payment_status !== "paid" && (
+                    <>
+                      <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => nav("/pos", { state: { orderId: o.id, tableId: o.table_id } })}><Edit className="w-4 h-4" /></Button>
+                      <Button size="icon" variant="outline" className="h-8 w-8 text-destructive" onClick={() => deleteOrder(o.id)}><Trash2 className="w-4 h-4" /></Button>
+                    </>
+                  )}
+                  {o.payment_status !== "paid" && o.items.length > 0 ? (
+                    <Button size="sm" variant="outline" onClick={() => nav(`/pay/${o.id}`)}>Pay <ArrowRight className="w-3 h-3 ml-1" /></Button>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={() => nav(`/receipt/${o.id}`)}>Receipt</Button>
+                  )}
+                </div>
               </Card>
             ))}
           </div>

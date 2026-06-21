@@ -34,6 +34,7 @@ import Receipt from "@/pages/Receipt";
 import CustomerDisplay from "@/pages/CustomerDisplay";
 import QrOrder from "@/pages/QrOrder";
 import NotFound from "@/pages/NotFound";
+import AccessDenied from "@/pages/AccessDenied";
 
 const queryClient = new QueryClient();
 
@@ -49,15 +50,16 @@ export default function App() {
 
               {/* Public */}
               <Route path="/s/:token" element={<QrOrder />} />
+              <Route path="/customer-display" element={<CustomerDisplay />} />
               <Route path="/customer-display/:orderId" element={<CustomerDisplay />} />
               <Route path="/pay/:orderId" element={<Payment />} />
               <Route path="/receipt/:orderId" element={<Receipt />} />
 
               {/* Customer */}
-              <Route path="/customer" element={<ProtectedRoute allow={["customer"]}><CustomerDashboard /></ProtectedRoute>} />
-              <Route path="/customer/menu" element={<ProtectedRoute allow={["customer"]}><CustomerMenu /></ProtectedRoute>} />
-              <Route path="/customer/orders" element={<ProtectedRoute allow={["customer"]}><CustomerOrders /></ProtectedRoute>} />
-              <Route path="/customer/rewards" element={<ProtectedRoute allow={["customer"]}><CustomerRewards /></ProtectedRoute>} />
+              <Route path="/customer" element={<ProtectedRoute allow={["customer","guest"]}><CustomerDashboard /></ProtectedRoute>} />
+              <Route path="/customer/menu" element={<ProtectedRoute allow={["customer","guest"]}><CustomerMenu /></ProtectedRoute>} />
+              <Route path="/customer/orders" element={<ProtectedRoute allow={["customer","guest"]}><CustomerOrders /></ProtectedRoute>} />
+              <Route path="/customer/rewards" element={<ProtectedRoute allow={["customer","guest"]}><CustomerRewards /></ProtectedRoute>} />
 
               {/* Admin */}
               <Route path="/admin" element={<ProtectedRoute allow={["admin"]}><AdminDashboard /></ProtectedRoute>} />
@@ -82,8 +84,9 @@ export default function App() {
               <Route path="/pos/orders" element={<ProtectedRoute allow={["admin", "cashier"]}><POSOrders /></ProtectedRoute>} />
 
               {/* Kitchen */}
-              <Route path="/kds" element={<ProtectedRoute allow={["admin", "cashier", "kitchen"]}><KDS /></ProtectedRoute>} />
+              <Route path="/kds" element={<ProtectedRoute allow={["admin", "kitchen"]}><KDS /></ProtectedRoute>} />
 
+              <Route path="/access-denied" element={<AccessDenied />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

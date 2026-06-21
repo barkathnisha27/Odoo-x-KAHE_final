@@ -1,6 +1,9 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useStore, formatINR, comboSuggestion } from "@/lib/store";
+import { useStore, formatINR, comboSuggestion, saveKitchenOrder } from "@/lib/store";
+import { getProductImage } from "@/lib/imageHelper";
+import { dedupeProducts } from "@/lib/dedupe";
+import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +15,8 @@ import { DemoBadge } from "@/components/DemoBadge";
 
 export default function CustomerMenu() {
   const nav = useNavigate();
-  const { products, categories, customer, createOrder, addItemToOrder, removeItemFromOrder, changeItemQty, applyDiscount, sendToKitchen, getProductAvailability, coupons, orders } = useStore();
+  const { user } = useAuth();
+  const { products, categories, customer, createOrder, addItemToOrder, removeItemFromOrder, changeItemQty, applyDiscount, sendToKitchen, sendOrderToKitchen, getProductAvailability, coupons, orders } = useStore();
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState<string | "all">("all");
   const [cartOrderId, setCartOrderId] = useState<string | null>(null);
@@ -20,14 +24,46 @@ export default function CustomerMenu() {
 
   const order = orders.find(o => o.id === cartOrderId);
 
-  const filtered = useMemo(() => products.filter(p =>
+  React.useEffect(() => {
+    if (!order) return;
+    let autoAmount = 0;
+    
+    coupons.filter(c => c.active && c.promo_type && c.promo_type !== "coupon").forEach(c => {
+      let valid = false;
+      if (c.promo_type === "auto_order" && order.subtotal >= (c.min_order_amount || 0)) valid = true;
+      else if (c.promo_type === "auto_product") {
+        const totalQty = order.items.reduce((s, i) => s + i.quantity, 0);
+        if (totalQty >= (c.min_quantity || 0)) valid = true;
+      }
+      
+      if (valid) {
+        const amt = c.discount_type === "percentage" ? Math.round(order.subtotal * (c.discount_value / 100)) : c.discount_value;
+        if (amt > autoAmount) autoAmount = amt;
+      }
+    });
+
+    if (autoAmount > 0 && order.discount_amount !== autoAmount && !coupon) {
+      applyDiscount(order.id, autoAmount);
+      toast.success("Auto promotion applied!");
+    } else if (autoAmount === 0 && order.discount_amount > 0 && !coupon) {
+      applyDiscount(order.id, 0);
+    }
+  }, [order?.subtotal, order?.items, coupons, coupon]);
+
+  const rawFiltered = useMemo(() => products.filter(p =>
     (cat === "all" || p.category_id === cat) &&
     p.name.toLowerCase().includes(search.toLowerCase())
   ), [products, cat, search]);
+  
+  const filtered = useMemo(() => dedupeProducts(rawFiltered), [rawFiltered]);
 
   function ensureOrder() {
     if (order) return order;
-    const o = createOrder({ source: "Customer", customerId: customer.id, customerName: customer.name });
+    
+    // Fallback logic as requested to ensure logged in user details are used
+    const customerName = user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || customer.name || "Customer";
+    
+    const o = createOrder({ source: "Customer", customerId: user?.id || customer.id, customerName });
     setCartOrderId(o.id);
     return o;
   }
@@ -50,10 +86,26 @@ export default function CustomerMenu() {
   }
 
   function placeOrder() {
-    if (!order || order.items.length === 0) return;
-    sendToKitchen(order.id);
-    toast.success("Order sent to kitchen! Tracking live.");
-    nav("/customer");
+    if (!order || !order.items || order.items.length === 0) {
+      toast.error("Add items before sending to kitchen.");
+      return;
+    }
+    
+    // Emergency bridge save
+    const savedOrder = saveKitchenOrder({
+      ...order,
+      order_source: "customer",
+      customer_name: user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || customer.name || "Customer",
+      customer_email: user?.email || null,
+      customer_id: user?.id || customer.id || null,
+      cafe_id: user?.user_metadata?.cafe_id || "demo-cafe-1",
+    });
+
+    if (savedOrder) {
+      setCartOrderId(null);
+      toast.success("Order sent to kitchen successfully.");
+      nav("/customer");
+    }
   }
 
   const combo = order ? comboSuggestion(order.items.map(i => i.product_id)) : null;
@@ -136,16 +188,25 @@ export default function CustomerMenu() {
         {filtered.map(p => {
           const avail = getProductAvailability(p.id);
           const catObj = categories.find(c => c.id === p.category_id);
+          const imgSrc = p.image_url || getProductImage(p.name, catObj?.name);
           return (
-            <Card key={p.id} className="overflow-hidden hover:shadow-elevated transition-all">
-              <div className="h-24 bg-gradient-to-br" style={{ background: `linear-gradient(135deg, ${catObj?.color}40, ${catObj?.color}15)` }}>
-                <div className="p-3 flex justify-between">
-                  {p.is_popular && <Badge className="bg-terracotta text-terracotta-foreground border-0 text-[10px]">Popular</Badge>}
-                  {!avail.available && <Badge variant="destructive" className="text-[10px]">Sold out</Badge>}
-                  {avail.available && avail.lowIngredient && <Badge variant="outline" className="text-[10px] bg-warning/20 text-warning-foreground border-warning/40 ml-auto">Low: {avail.lowIngredient}</Badge>}
+            <Card key={p.id} className="overflow-hidden hover:shadow-elevated transition-all flex flex-col group">
+              <div className="h-32 relative bg-secondary overflow-hidden">
+                <img 
+                  src={imgSrc} 
+                  alt={p.name} 
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-between p-3">
+                  <div className="flex justify-between items-start">
+                    {p.is_popular && <Badge className="bg-terracotta text-terracotta-foreground border-0 text-[10px] shadow-sm">Popular</Badge>}
+                    {!avail.available && <Badge variant="destructive" className="text-[10px] shadow-sm ml-auto">Sold out</Badge>}
+                    {avail.available && avail.lowIngredient && <Badge variant="outline" className="text-[10px] bg-warning/90 text-warning-foreground border-0 shadow-sm ml-auto">Low: {avail.lowIngredient}</Badge>}
+                  </div>
                 </div>
               </div>
-              <div className="p-3">
+              <div className="p-3 flex-1 flex flex-col">
                 <div className="font-semibold text-sm leading-tight">{p.name}</div>
                 <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
                   <Clock className="w-3 h-3" /> {p.prep_time_minutes} min

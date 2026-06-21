@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table as T, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Database, Download, Sparkles } from "lucide-react";
 import { exportToXLSX, exportToPDF } from "@/lib/exporters";
+import { toast } from "sonner";
 
 // Synthetic training dataset for the demo predictions
 const DATASET = Array.from({ length: 28 }, (_, i) => {
@@ -26,11 +27,25 @@ const DATASET = Array.from({ length: 28 }, (_, i) => {
 });
 
 export default function Dataset() {
-  const xlsx = () => exportToXLSX("dineflow-dataset", [{ name: "Training Data", rows: DATASET }]);
-  const pdf = () => exportToPDF("dineflow-dataset", "DineFlow Prediction Dataset", [
-    { heading: "Last 28 Days", columns: ["Date","Day","Orders","Revenue","Avg","Peak","Weather","Promo","Waste(g)"],
-      rows: DATASET.map(d => [d.date, d.weekday, d.orders, d.revenue, d.avg_ticket, d.peak_hour, d.weather, d.promotion, d.wastage_g]) }
-  ]);
+  const xlsx = () => {
+    try {
+      exportToXLSX("dineflow-dataset", [{ name: "Training Data", rows: DATASET }]);
+      toast.success("Report downloaded successfully.");
+    } catch (e) {
+      toast.error("Failed to download report. Please try again.");
+    }
+  };
+  const pdf = () => {
+    try {
+      exportToPDF("dineflow-dataset", "DineFlow Prediction Dataset", [
+        { heading: "Last 28 Days", columns: ["Date","Day","Orders","Revenue","Avg","Peak","Weather","Promo","Waste(g)"],
+          rows: DATASET.map(d => [d.date, d.weekday, d.orders, d.revenue, d.avg_ticket, d.peak_hour, d.weather, d.promotion, d.wastage_g]) }
+      ]);
+      toast.success("Report downloaded successfully.");
+    } catch (e) {
+      toast.error("Failed to download report. Please try again.");
+    }
+  };
 
   return (
     <AppShell>

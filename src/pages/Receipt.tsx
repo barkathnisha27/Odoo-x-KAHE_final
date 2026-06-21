@@ -1,9 +1,14 @@
+import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useStore, formatINR } from "@/lib/store";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { CheckCircle2, Printer, Mail, Download, Coffee } from "lucide-react";
 import { toast } from "sonner";
+import { downloadOrderBillPDF } from "@/lib/exporters";
 import { DemoBadge } from "@/components/DemoBadge";
 
 export default function Receipt() {
@@ -11,7 +16,16 @@ export default function Receipt() {
   const nav = useNavigate();
   const { orders } = useStore();
   const order = orders.find(o => o.id === orderId);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [email, setEmail] = useState(order?.customer_email || "");
+
   if (!order) return <div className="p-8">Order not found.</div>;
+
+  const handleEmail = () => {
+    if (!email) return toast.error("Please enter an email");
+    toast.success(`Receipt sent to ${email}`);
+    setEmailOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-secondary/40 py-8">
@@ -67,14 +81,35 @@ export default function Receipt() {
 
         <div className="grid grid-cols-3 gap-2 mt-4 print:hidden">
           <Button variant="outline" onClick={() => window.print()}><Printer className="w-4 h-4 mr-1.5" /> Print</Button>
-          <Button variant="outline" onClick={() => toast.success("Receipt emailed (demo)")}><Mail className="w-4 h-4 mr-1.5" /> Email</Button>
-          <Button variant="outline" onClick={() => toast.success("Receipt PDF ready (demo)")}><Download className="w-4 h-4 mr-1.5" /> PDF</Button>
+          <Button variant="outline" onClick={() => setEmailOpen(true)}><Mail className="w-4 h-4 mr-1.5" /> Email</Button>
+          <Button variant="outline" onClick={() => {
+            const success = downloadOrderBillPDF(order);
+            if (success) {
+              toast.success("Bill downloaded successfully.");
+            } else {
+              toast.error("Failed to download bill. Please try again.");
+            }
+          }}><Download className="w-4 h-4 mr-1.5" /> PDF</Button>
         </div>
 
         <div className="text-center mt-4 print:hidden">
           <Link to="/pos"><Button variant="ghost">← Back to POS</Button></Link>
         </div>
       </div>
+
+      <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Email Receipt</DialogTitle></DialogHeader>
+          <div className="py-4 space-y-2">
+            <Label>Customer Email</Label>
+            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="customer@example.com" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailOpen(false)}>Cancel</Button>
+            <Button onClick={handleEmail}><Mail className="w-4 h-4 mr-2" /> Send</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -12,16 +12,19 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table as T, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Package, Plus, Edit, Trash2, Search } from "lucide-react";
+import { Package, Plus, Edit, Trash2, Search, FileText, FileSpreadsheet, Image as ImageIcon, Sparkles } from "lucide-react";
 import { useStore, formatINR } from "@/lib/store";
 import type { Product } from "@/lib/types";
 import { toast } from "sonner";
+import { exportToPDF, exportToXLSX } from "@/lib/exporters";
+import { getProductImage } from "@/lib/imageHelper";
+import { dedupeProducts } from "@/lib/dedupe";
 
 const empty = (): Product => ({
   id: "p" + Math.random().toString(36).slice(2, 8),
   name: "", category_id: "c1", price: 100, unit: "piece", tax_percentage: 5, prep_time_minutes: 5,
   station: "Beverage Counter", stock_qty: 20, sold_today: 0, margin_percentage: 50,
-  is_kitchen_item: true, is_available: true, is_popular: false, dietary_tags: ["veg"], description: "",
+  is_kitchen_item: true, is_available: true, is_popular: false, dietary_tags: ["veg"], description: "", image_url: "",
 });
 
 export default function Products() {
@@ -30,7 +33,8 @@ export default function Products() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [q, setQ] = useState("");
 
-  const filtered = products.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+  const rawFiltered = products.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+  const filtered = dedupeProducts(rawFiltered);
 
   const save = () => {
     if (!editing) return;
@@ -40,12 +44,61 @@ export default function Products() {
     setOpen(false); setEditing(null);
   };
 
+  const handlePDF = () => {
+    try {
+      exportToPDF("dineflow_product_report", "Products Report", [
+        {
+          heading: "Products",
+          columns: ["Name", "Category", "Price", "Stock", "Sold Today", "Status"],
+          rows: filtered.map(p => [
+            p.name,
+            categories.find(c => c.id === p.category_id)?.name || "",
+            formatINR(p.price),
+            p.stock_qty.toString(),
+            p.sold_today.toString(),
+            p.is_available ? "Available" : "Off"
+          ])
+        }
+      ]);
+      toast.success("Report downloaded successfully.");
+    } catch (e) {
+      toast.error("Failed to download report. Please try again.");
+    }
+  };
+
+  const handleXLSX = () => {
+    try {
+      exportToXLSX("dineflow_product_report", [
+        {
+          name: "Products",
+          rows: filtered.map(p => ({
+            Name: p.name,
+            Category: categories.find(c => c.id === p.category_id)?.name || "",
+            Price: p.price,
+            Stock: p.stock_qty,
+            "Sold Today": p.sold_today,
+            Status: p.is_available ? "Available" : "Off"
+          }))
+        }
+      ]);
+      toast.success("Report downloaded successfully.");
+    } catch (e) {
+      toast.error("Failed to download report. Please try again.");
+    }
+  };
+
   return (
     <AppShell>
       <DemoBadge />
       <div className="p-6 lg:p-8 max-w-[1400px] mx-auto">
         <PageHeader icon={Package} title="Products" description="Manage menu items, prices, stock and recipes"
-          actions={<Button onClick={() => { setEditing(empty()); setOpen(true); }}><Plus className="w-4 h-4 mr-1.5" /> New Product</Button>}
+          actions={
+            <>
+              <Button variant="outline" onClick={handlePDF}><FileText className="w-4 h-4 mr-1.5" /> Export PDF</Button>
+              <Button variant="outline" onClick={handleXLSX}><FileSpreadsheet className="w-4 h-4 mr-1.5" /> Export Excel</Button>
+              <Button onClick={() => { setEditing(empty()); setOpen(true); }}><Plus className="w-4 h-4 mr-1.5" /> New Product</Button>
+            </>
+          }
         />
 
         <Card className="p-4 shadow-soft mb-4">
@@ -59,7 +112,7 @@ export default function Products() {
           <T>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead><TableHead>Category</TableHead><TableHead>Price</TableHead>
+                <TableHead className="w-12">Image</TableHead><TableHead>Name</TableHead><TableHead>Category</TableHead><TableHead>Price</TableHead>
                 <TableHead>Station</TableHead><TableHead>Stock</TableHead><TableHead>Sold</TableHead>
                 <TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -69,6 +122,11 @@ export default function Products() {
                 const cat = categories.find(c => c.id === p.category_id);
                 return (
                   <TableRow key={p.id}>
+                    <TableCell>
+                      <div className="w-10 h-10 rounded bg-secondary overflow-hidden flex items-center justify-center">
+                        {p.image_url ? <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" /> : <ImageIcon className="w-4 h-4 text-muted-foreground" />}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="font-medium">{p.name} {p.is_popular && <Badge variant="secondary" className="ml-1 text-[10px]">🔥</Badge>}</div>
                       <div className="text-xs text-muted-foreground">{p.prep_time_minutes} min · {p.unit}</div>
@@ -117,6 +175,23 @@ export default function Products() {
                 <div><Label>Tax %</Label><Input type="number" value={editing.tax_percentage} onChange={e => setEditing({ ...editing, tax_percentage: +e.target.value })} /></div>
                 <div><Label>Margin %</Label><Input type="number" value={editing.margin_percentage} onChange={e => setEditing({ ...editing, margin_percentage: +e.target.value })} /></div>
                 <div className="col-span-2"><Label>Description</Label><Textarea rows={2} value={editing.description || ""} onChange={e => setEditing({ ...editing, description: e.target.value })} /></div>
+                <div className="col-span-2 space-y-2">
+                  <Label>Product Image URL</Label>
+                  <div className="flex gap-2">
+                    <Input value={editing.image_url || ""} onChange={e => setEditing({ ...editing, image_url: e.target.value })} placeholder="https://..." />
+                    <Button variant="secondary" onClick={() => {
+                      const catName = categories.find(c => c.id === editing.category_id)?.name || "";
+                      setEditing({ ...editing, image_url: getProductImage(editing.name, catName) });
+                    }}>
+                      <Sparkles className="w-4 h-4 mr-1.5" /> Auto Find Image
+                    </Button>
+                  </div>
+                  {editing.image_url && (
+                    <div className="mt-2 h-32 w-48 rounded-lg overflow-hidden border border-border">
+                      <img src={editing.image_url} alt="Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
                 <div className="col-span-2"><Label>Dietary tags (comma-separated)</Label><Input value={editing.dietary_tags.join(", ")} onChange={e => setEditing({ ...editing, dietary_tags: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} /></div>
                 <div className="flex items-center justify-between col-span-1"><Label>Available</Label><Switch checked={editing.is_available} onCheckedChange={v => setEditing({ ...editing, is_available: v })} /></div>
                 <div className="flex items-center justify-between col-span-1"><Label>Popular</Label><Switch checked={editing.is_popular} onCheckedChange={v => setEditing({ ...editing, is_popular: v })} /></div>

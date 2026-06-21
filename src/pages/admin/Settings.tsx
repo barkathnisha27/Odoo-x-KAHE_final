@@ -15,12 +15,62 @@ import { useExtraStore } from "@/lib/extraStore";
 import { useAuth } from "@/lib/auth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Settings() {
   const { resetDemo, products, orders, ingredients } = useStore();
   const { resetExtra, employees, bookings } = useExtraStore();
-  const { signOut, user } = useAuth();
+  const { signOut, user, cafeId, isLocalMode } = useAuth();
   const nav = useNavigate();
+  
+  const [flags, setFlags] = useState<Record<string, boolean>>({
+    enable_ai: true,
+    enable_predictions: true,
+    enable_map: true,
+    enable_kds: true
+  });
+
+  useEffect(() => {
+    if (!cafeId) return;
+    const fetchFlags = async () => {
+      if (isLocalMode) {
+        const local = localStorage.getItem(`dineflow_flags_${cafeId}`);
+        if (local) setFlags(JSON.parse(local));
+        return;
+      }
+      try {
+        const { data } = await supabase.from("feature_flags").select("*").eq("cafe_id", cafeId);
+        if (data && data.length > 0) {
+          const fetched: Record<string, boolean> = {};
+          data.forEach((f: any) => fetched[f.feature_name] = f.is_enabled);
+          setFlags(prev => ({ ...prev, ...fetched }));
+        }
+      } catch (e) {
+        // fallback
+      }
+    };
+    fetchFlags();
+  }, [cafeId, isLocalMode]);
+
+  const toggleFlag = async (key: string, val: boolean) => {
+    const next = { ...flags, [key]: val };
+    setFlags(next);
+    toast.success(`Feature updated`);
+    
+    if (isLocalMode) {
+      localStorage.setItem(`dineflow_flags_${cafeId}`, JSON.stringify(next));
+      return;
+    }
+    
+    try {
+      await supabase.from("feature_flags").upsert({ cafe_id: cafeId, feature_name: key, is_enabled: val }, { onConflict: 'cafe_id, feature_name' });
+    } catch (e) {
+      localStorage.setItem(`dineflow_flags_${cafeId}`, JSON.stringify(next));
+    }
+  };
 
   const handleReset = () => {
     resetDemo();
@@ -65,6 +115,34 @@ export default function Settings() {
             <Stat label="Ingredients" value={ingredients.length} />
             <Stat label="Employees" value={employees.length} />
             <Stat label="Bookings" value={bookings.length} />
+          </div>
+        </Card>
+
+        <Card className="p-6 shadow-soft mb-4">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><SettingsIcon className="w-5 h-5" /></div>
+            <div>
+              <div className="font-semibold">Feature Management</div>
+              <div className="text-sm text-muted-foreground">Enable or disable modules across the system</div>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+              <div><Label className="text-base">AI Assistant</Label><p className="text-xs text-muted-foreground">Generative AI chat for insights</p></div>
+              <Switch checked={flags.enable_ai} onCheckedChange={(v) => toggleFlag('enable_ai', v)} />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+              <div><Label className="text-base">Demand Predictions</Label><p className="text-xs text-muted-foreground">ML-powered sales forecasting</p></div>
+              <Switch checked={flags.enable_predictions} onCheckedChange={(v) => toggleFlag('enable_predictions', v)} />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+              <div><Label className="text-base">Map Intelligence</Label><p className="text-xs text-muted-foreground">Geospatial data and heatmaps</p></div>
+              <Switch checked={flags.enable_map} onCheckedChange={(v) => toggleFlag('enable_map', v)} />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+              <div><Label className="text-base">Kitchen Display System (KDS)</Label><p className="text-xs text-muted-foreground">Digital kitchen ticket management</p></div>
+              <Switch checked={flags.enable_kds} onCheckedChange={(v) => toggleFlag('enable_kds', v)} />
+            </div>
           </div>
         </Card>
 
